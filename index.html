@@ -5,35 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <title>Ouchi Colon ころころレース</title>
   <style>
-    :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #1a1624;
-      font-family: "MS Gothic", "Osaka-Mono", monospace;
-    }
-    .frame {
-      width: min(100vw, 420px);
-      padding: 10px;
-      background: #2e2a3b;
-      border: 4px solid #5d5578;
-      border-radius: 8px;
-      image-rendering: pixelated;
-    }
-    canvas {
-      width: 390px;
-      height: 844px;
-      max-width: 100%;
-      display: block;
-      margin: 0 auto;
-      background: #6fa8d6;
-      border: 4px solid #130f1f;
-      image-rendering: pixelated;
-      touch-action: none;
-    }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #19162a; font-family: monospace; }
+    .frame { width: min(100vw, 430px); padding: 10px; background: #2c2440; border: 4px solid #6f6099; border-radius: 10px; }
+    canvas { width: 390px; height: 844px; max-width: 100%; display: block; border: 4px solid #130f1f; image-rendering: pixelated; touch-action: none; }
   </style>
 </head>
 <body>
@@ -41,72 +16,40 @@
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
-
-    const W = canvas.width;
-    const H = canvas.height;
-
-    const state = {
-      mode: 'title',
-      lap: 1,
-      score: 0,
-      distance: 0,
-      speed: 1.2,
-      maxDistance: 3200,
-      playerX: 0,
-      steer: 0,
-      selectedCharacter: 0,
-      selectedCourse: 0,
-      enemyX: 0,
-      enemyDrift: 0,
-      time: 0,
-      raceTimer: 0,
-      items: [],
-      obstacles: [],
-      result: 'GOAL!'
-    };
-
+    const W = canvas.width, H = canvas.height;
     const lanes = [-0.62, -0.22, 0.22, 0.62];
     const keys = { left: false, right: false };
     const pix = 2;
 
+    const state = {
+      mode: 'title', lap: 1, score: 0, distance: 0, speed: 1.2, maxDistance: 3200,
+      playerX: 0, steer: 0, selectedCharacter: 0, selectedCourse: 0,
+      enemyX: 0, enemyDrift: 0, time: 0, raceTimer: 0,
+      items: [], obstacles: [], sparkles: [], result: 'GOAL!'
+    };
+
     function resetRace() {
-      state.lap = 1;
-      state.score = 0;
-      state.distance = 0;
-      state.speed = 1.2;
-      state.playerX = 0;
-      state.steer = 0;
-      state.enemyX = 0;
-      state.enemyDrift = 0;
-      state.raceTimer = 0;
-      state.items = [];
-      state.obstacles = [];
+      state.lap = 1; state.score = 0; state.distance = 0; state.speed = 1.2;
+      state.playerX = 0; state.steer = 0; state.enemyX = 0; state.enemyDrift = 0;
+      state.raceTimer = 0; state.items = []; state.obstacles = []; state.sparkles = [];
       spawnTrackObjects();
     }
 
     function spawnTrackObjects() {
-      for (let z = 200; z < state.maxDistance; z += 130) {
-        if (Math.random() < 0.62) {
-          state.items.push({ z, lane: lanes[(Math.random() * lanes.length) | 0], got: false });
-        }
-        if (Math.random() < 0.4) {
-          state.obstacles.push({ z: z + 60, lane: lanes[(Math.random() * lanes.length) | 0], hit: false });
-        }
+      for (let z = 220; z < state.maxDistance; z += 120) {
+        if (Math.random() < 0.72) state.items.push({ z, lane: lanes[(Math.random() * lanes.length) | 0], got: false });
+        if (Math.random() < 0.45) state.obstacles.push({ z: z + 55, lane: lanes[(Math.random() * lanes.length) | 0], hit: false });
       }
     }
 
-    function jumpEffect() {
-      // 未使用: 今後ジャンプ演出を追加するためのプレースホルダー
-    }
+    function jumpEffect() {}
 
     function project(x, z) {
-      const horizon = H * 0.3;
-      const camZ = 40;
+      const horizon = H * 0.26;
+      const camZ = 36;
       const depth = Math.max(0.001, (z - camZ) / 300);
       const scale = 1 / depth;
-      const screenX = W * 0.5 + x * scale * W * 0.44;
-      const screenY = horizon + (1 - scale * 0.18) * H * 0.64;
-      return { x: screenX, y: screenY, scale };
+      return { x: W * 0.5 + x * scale * W * 0.46, y: horizon + (1 - scale * 0.2) * H * 0.66, scale };
     }
 
     function update(dt) {
@@ -119,22 +62,18 @@
 
       const steerInput = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
       state.steer = steerInput;
-      state.playerX += steerInput * dt * 1.8;
-      state.playerX = Math.max(-0.8, Math.min(0.8, state.playerX));
+      state.playerX = Math.max(-0.8, Math.min(0.8, state.playerX + steerInput * dt * 1.8));
 
-      state.speed += 0.08 * dt;
-      state.speed = Math.min(4.8, Math.max(0.8, state.speed));
+      state.speed = Math.min(4.8, Math.max(0.8, state.speed + 0.08 * dt));
       state.distance += state.speed * 46 * dt;
-
       state.lap = Math.min(3, 1 + ((state.distance / (state.maxDistance / 3)) | 0));
 
-      for (const star of state.items) {
-        if (star.got) continue;
-        const dz = star.z - state.distance;
-        if (dz > 0 && dz < 45 && Math.abs(star.lane - state.playerX) < 0.16) {
-          star.got = true;
-          state.score += 1;
-          state.speed = Math.min(5.2, state.speed + 0.22);
+      for (const s of state.items) {
+        if (s.got) continue;
+        const dz = s.z - state.distance;
+        if (dz > 0 && dz < 45 && Math.abs(s.lane - state.playerX) < 0.16) {
+          s.got = true; state.score += 1; state.speed = Math.min(5.2, state.speed + 0.22);
+          for (let i = 0; i < 12; i++) state.sparkles.push({ t: 0.4 + Math.random() * 0.4, x: W * 0.5 + (Math.random() - 0.5) * 70, y: H - 180 + (Math.random() - 0.5) * 50 });
         }
       }
 
@@ -142,189 +81,175 @@
         if (ob.hit) continue;
         const dz = ob.z - state.distance;
         if (dz > 0 && dz < 42 && Math.abs(ob.lane - state.playerX) < 0.2) {
-          ob.hit = true;
-          state.speed = Math.max(0.7, state.speed * 0.72);
+          ob.hit = true; state.speed = Math.max(0.7, state.speed * 0.72);
         }
       }
 
-      if (state.distance >= state.maxDistance) {
-        state.mode = 'goal';
-        state.result = 'GOAL!';
-      }
-
-      if (state.raceTimer > 85) {
-        state.mode = 'gameOver';
-        state.result = 'TIME UP';
-      }
+      state.sparkles = state.sparkles.filter((p) => (p.t -= dt) > 0);
+      if (state.distance >= state.maxDistance) { state.mode = 'goal'; state.result = 'GOAL!'; }
+      if (state.raceTimer > 85) { state.mode = 'gameOver'; state.result = 'TIME UP'; }
     }
 
-    function drawPixelRect(x, y, w, h, color) {
-      ctx.fillStyle = color;
-      ctx.fillRect((x / pix | 0) * pix, (y / pix | 0) * pix, (w / pix | 0) * pix, (h / pix | 0) * pix);
+    function pxRect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect((x / pix | 0) * pix, (y / pix | 0) * pix, (w / pix | 0) * pix, (h / pix | 0) * pix); }
+
+    function drawRoomBackground() {
+      pxRect(0, 0, W, H, '#f6d9be');
+      pxRect(0, 0, W, 270, '#ffe7cf');
+      for (let y = 8; y < 260; y += 18) for (let x = 8; x < W; x += 18) pxRect(x, y, 4, 4, (x + y) % 36 ? '#ffd8ba' : '#fff3a4');
+      pxRect(132, 36, 126, 90, '#a8e0ff');
+      pxRect(126, 30, 138, 102, '#f7f7ff');
+      pxRect(146, 36, 18, 90, '#ffd7ef'); pxRect(226, 36, 18, 90, '#ffd7ef');
+      drawLivingProps();
+      drawWoodFloor();
+    }
+
+    function drawLivingProps() {
+      pxRect(14, 168, 100, 56, '#8ec7f7'); pxRect(24, 152, 80, 20, '#9bd0ff');
+      pxRect(284, 138, 92, 94, '#d6a278'); for (let i = 0; i < 4; i++) pxRect(294, 152 + i * 20, 72, 8, ['#96d17c', '#f4a0ba', '#88b4ff', '#f4de75'][i]);
+      pxRect(316, 232, 36, 28, '#73b36d'); pxRect(330, 210, 8, 24, '#7a5a3b');
+      pxRect(44, 238, 26, 22, '#fff3f3'); pxRect(48, 230, 6, 8, '#f4b8b8'); pxRect(60, 230, 6, 8, '#f4b8b8');
+      pxRect(86, 250, 16, 16, '#ff6f6f'); pxRect(106, 252, 20, 14, '#7ab9ff'); pxRect(130, 248, 14, 18, '#ffd46f');
+      ctx.fillStyle = '#ff95ba'; ctx.beginPath(); ctx.arc(262, 248, 11, 0, Math.PI * 2); ctx.fill();
+    }
+
+    function drawWoodFloor() {
+      pxRect(0, 260, W, H - 260, '#be8c5e');
+      for (let y = 260; y < H; y += 20) pxRect(0, y, W, 2, '#aa7649');
+      for (let x = 0; x < W; x += 30) pxRect(x, 260, 2, H - 260, '#c9996d');
+    }
+
+    function drawTrack() {
+      const horizon = H * 0.3;
+      for (let y = horizon; y < H; y += 4) {
+        const t = (y - horizon) / (H - horizon);
+        const half = 52 + t * 150;
+        const cx = W * 0.5;
+        const l = cx - half, r = cx + half;
+        pxRect(l, y, r - l, 4, ((y + state.distance) / 18 | 0) % 2 ? '#d5a170' : '#c99362');
+        pxRect(l - 10, y, 10, 4, ((y / 10) | 0) % 2 ? '#ffffff' : '#ff5b5b');
+        pxRect(r, y, 10, 4, ((y / 10) | 0) % 2 ? '#ffffff' : '#ff5b5b');
+        if ((y / 24 | 0) % 2 === 0) pxRect(cx - 2, y, 4, 4, '#f7e8cf');
+      }
     }
 
     function drawCourse() {
-      const horizon = H * 0.3;
-      drawPixelRect(0, 0, W, horizon, '#78afd7');
-      drawPixelRect(0, horizon - 22, W, 22, '#95c6e8');
+      drawRoomBackground();
+      drawTrack();
+    }
 
-      for (let y = horizon; y < H; y += 4) {
-        const t = (y - horizon) / (H - horizon);
-        const halfRoad = 28 + t * 138;
-        const cx = W / 2;
-        const left = cx - halfRoad;
-        const right = cx + halfRoad;
-
-        const plank = (((y + (state.distance * 0.9)) / 18) | 0) % 2;
-        drawPixelRect(0, y, left, 4, '#6e5e49');
-        drawPixelRect(right, y, W - right, 4, '#6e5e49');
-        drawPixelRect(left, y, right - left, 4, plank ? '#b98a5c' : '#c89a6d');
-
-        if ((y / 20 | 0) % 2 === 0) {
-          drawPixelRect(cx - 2, y, 4, 4, '#e9ddbd');
-        }
-      }
-
-      for (let i = 0; i < 7; i++) {
-        const z = (i * 140 + (state.distance % 140)) + 80;
-        const p = project(-1.2, z);
-        const q = project(1.2, z);
-        drawPixelRect(p.x - 6, p.y - 18, 12, 18, '#6f5135');
-        drawPixelRect(q.x - 6, q.y - 18, 12, 18, '#6f5135');
-      }
+    function drawPixelLogo() {
+      pxRect(W / 2 - 108, 8, 216, 40, '#ffffffdd');
+      pxRect(W / 2 - 104, 12, 208, 32, '#f5fbff');
+      ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#294059'; ctx.fillText('Ouchi Colon ころころレース', W / 2 - 90, 35);
+      ctx.fillStyle = '#90b4d4'; ctx.fillText('Ouchi Colon ころころレース', W / 2 - 89, 34);
     }
 
     function drawStar(x, y, s) {
-      ctx.fillStyle = '#ffe066';
+      ctx.strokeStyle = '#fffbe8'; ctx.lineWidth = 2;
+      ctx.fillStyle = '#ffd84d';
       ctx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const a = -Math.PI / 2 + i * Math.PI / 5;
-        const r = (i % 2 === 0 ? s : s * 0.45);
-        const px = x + Math.cos(a) * r;
-        const py = y + Math.sin(a) * r;
-        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5; const r = i % 2 ? s * 0.45 : s; const px = x + Math.cos(a) * r; const py = y + Math.sin(a) * r; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      pxRect(x - 1, y - s - 8, 2, 6, '#fff8cc');
     }
 
-    function drawObstacle(x, y, scale) {
-      const w = 18 * scale;
-      const h = 16 * scale;
-      drawPixelRect(x - w / 2, y - h, w, h, '#5f4b7a');
-      drawPixelRect(x - w / 2 + 4, y - h + 4, w - 8, h - 8, '#7f66a3');
+    function drawToyBlock(x, y, scale, c1, c2) {
+      const w = 20 * scale, h = 17 * scale;
+      pxRect(x - w / 2, y - h, w, h, c1); pxRect(x - w / 2 + 4, y - h + 4, w - 8, h - 8, c2);
+      ctx.fillStyle = '#fff3d6'; ctx.font = `${Math.max(8, 8 * scale)}px monospace`; ctx.fillText('★', x - 4 * scale, y - 5 * scale);
     }
+
+    function drawObstacle(x, y, s) { drawToyBlock(x, y, s, '#5b7dff', '#ff6d6d'); }
 
     function drawMoolo() {
       if (state.mode !== 'race') return;
-      const z = 140;
-      const p = project(state.enemyX, z);
-      const s = Math.max(0.8, Math.min(1.4, p.scale * 1.5));
-      drawPixelRect(p.x - 14 * s, p.y - 22 * s, 28 * s, 20 * s, '#e1ecff');
-      drawPixelRect(p.x - 9 * s, p.y - 30 * s, 18 * s, 10 * s, '#c3d9ff');
-      drawPixelRect(p.x - 3 * s, p.y - 20 * s, 6 * s, 4 * s, '#354b80');
+      const p = project(state.enemyX, 150), s = Math.max(0.9, Math.min(1.6, p.scale * 1.7));
+      ctx.fillStyle = '#4dd57c'; ctx.beginPath(); ctx.arc(p.x, p.y - 20 * s, 18 * s, 0, Math.PI * 2); ctx.fill();
+      pxRect(p.x - 12 * s, p.y - 24 * s, 24 * s, 12 * s, '#1d2e35');
+      pxRect(p.x - 7 * s, p.y - 21 * s, 4 * s, 4 * s, '#d6f6ff'); pxRect(p.x + 3 * s, p.y - 21 * s, 4 * s, 4 * s, '#d6f6ff');
     }
 
     function drawMikaro() {
-      const baseY = H - 110;
-      const x = W * 0.5 + state.playerX * 120;
-      drawPixelRect(x - 26, baseY - 24, 52, 24, '#f5f1e6');
-      drawPixelRect(x - 20, baseY - 40, 40, 18, '#f8d8b0');
-      drawPixelRect(x - 14, baseY - 30, 8, 6, '#1e1d2d');
-      drawPixelRect(x + 6, baseY - 30, 8, 6, '#1e1d2d');
-      drawPixelRect(x - 34, baseY - 18, 8, 18, '#caa37a');
-      drawPixelRect(x + 26, baseY - 18, 8, 18, '#caa37a');
+      const bob = Math.sin(state.time * 9) * 4;
+      const y = H - 118 + bob, x = W * 0.5 + state.playerX * 120;
+      pxRect(x - 54, y - 18, 18, 26, '#3a3f5f'); pxRect(x + 36, y - 18, 18, 26, '#3a3f5f');
+      ctx.strokeStyle = '#2a2340'; ctx.lineWidth = 6;
+      ctx.fillStyle = '#f5f2e8'; ctx.beginPath(); ctx.arc(x, y - 16, 42, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      pxRect(x - 28, y - 54, 16, 12, '#9cd4ff'); pxRect(x + 12, y - 54, 16, 12, '#9cd4ff');
+      pxRect(x - 22, y - 28, 44, 20, '#f8d9b4'); pxRect(x - 14, y - 22, 8, 6, '#222'); pxRect(x + 6, y - 22, 8, 6, '#222');
+    }
+
+    function drawSparkleEffect() {
+      for (const p of state.sparkles) {
+        const a = Math.max(0, p.t / 0.8);
+        ctx.fillStyle = `rgba(255,255,220,${a})`;
+        pxRect(p.x - 2, p.y - 2, 4, 4, `rgba(255,255,220,${a})`);
+      }
+    }
+
+    function drawMiniMap() {
+      pxRect(10, H - 120, 126, 90, '#192a42cc');
+      ctx.strokeStyle = '#f1fbff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(28, H - 58); ctx.bezierCurveTo(48, H - 102, 96, H - 102, 116, H - 58); ctx.stroke();
+      const p = Math.min(1, state.distance / state.maxDistance);
+      const px = 28 + p * 88;
+      ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(px, H - 68, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6effa4'; ctx.beginPath(); ctx.arc(28 + (0.2 + 0.6 * (Math.sin(state.enemyDrift) * 0.5 + 0.5)) * 88, H - 74, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d8efff'; ctx.font = '12px monospace'; ctx.fillText('MINI MAP', 24, H - 98);
+    }
+
+    function drawSpeedMeter() {
+      pxRect(W - 144, H - 126, 132, 94, '#192a42cc');
+      ctx.fillStyle = '#d8efff'; ctx.font = '14px monospace'; ctx.fillText('SPEED', W - 122, H - 100);
+      ctx.font = 'bold 20px monospace'; ctx.fillText((state.speed * 30 | 0) + ' km/h', W - 132, H - 74);
+      const ratio = Math.min(1, state.speed / 5.2);
+      pxRect(W - 126, H - 58, 108, 14, '#2f4263');
+      pxRect(W - 126, H - 58, 108 * ratio, 14, ratio > 0.7 ? '#ff8e6f' : '#7ff0a4');
     }
 
     function drawHUD() {
-      ctx.fillStyle = '#101522bb';
-      ctx.fillRect(8, 8, W - 16, 28);
-      ctx.fillStyle = '#dff2ff';
-      ctx.font = '12px monospace';
-      ctx.fillText('LAP ' + state.lap + '/3', 14, 26);
-      ctx.fillText('★ x ' + String(state.score).padStart(2, '0'), W - 82, 26);
-      ctx.fillText('Ouchi Colon ころころレース', W / 2 - 72, 26);
-
-      ctx.fillStyle = '#111b29cc';
-      ctx.fillRect(10, H - 116, 108, 76);
-      ctx.fillStyle = '#89c3ff';
-      ctx.fillRect(18, H - 86, 92, 8);
-      const prog = Math.min(1, state.distance / state.maxDistance);
-      ctx.fillStyle = '#ffe066';
-      ctx.fillRect(18, H - 86, prog * 92, 8);
-      ctx.fillStyle = '#dff2ff';
-      ctx.fillText('MAP', 18, H - 96);
-
-      ctx.fillStyle = '#111b29cc';
-      ctx.fillRect(W - 122, H - 104, 112, 64);
-      ctx.fillStyle = '#dff2ff';
-
-      ctx.fillText('SPD', W - 108, H - 80);
-      ctx.fillText((state.speed * 30 | 0) + ' km/h', W - 108, H - 58);
+      drawPixelLogo();
+      pxRect(10, 12, 96, 34, '#223a58dd'); pxRect(W - 110, 12, 98, 34, '#223a58dd');
+      ctx.fillStyle = '#eff8ff'; ctx.font = 'bold 18px monospace'; ctx.fillText(`LAP ${state.lap}/3`, 18, 34);
+      ctx.fillText(`★ x ${String(state.score).padStart(2, '0')}`, W - 102, 34);
+      drawMiniMap(); drawSpeedMeter();
     }
 
     function drawTrackObjects() {
       for (const star of state.items) {
         if (star.got) continue;
-        const dz = star.z - state.distance;
-        if (dz < 20 || dz > 420) continue;
-        const p = project(star.lane, dz + 60);
-        const s = Math.max(4, Math.min(14, p.scale * 40));
+        const dz = star.z - state.distance; if (dz < 20 || dz > 420) continue;
+        const p = project(star.lane, dz + 60), s = Math.max(6, Math.min(16, p.scale * 44));
         drawStar(p.x, p.y - s, s);
       }
       for (const ob of state.obstacles) {
         if (ob.hit) continue;
-        const dz = ob.z - state.distance;
-        if (dz < 20 || dz > 420) continue;
-        const p = project(ob.lane, dz + 60);
-        const s = Math.max(0.6, Math.min(2.2, p.scale * 4.5));
+        const dz = ob.z - state.distance; if (dz < 20 || dz > 420) continue;
+        const p = project(ob.lane, dz + 60), s = Math.max(0.8, Math.min(2.4, p.scale * 5.2));
         drawObstacle(p.x, p.y, s);
       }
     }
 
     function drawMenu(title, subtitle, hint) {
-      drawPixelRect(0, 0, W, H, '#1f1a2c');
-      drawPixelRect(14, 120, W - 28, H - 240, '#2f2943');
-      ctx.fillStyle = '#f5f0dd';
-      ctx.font = '24px monospace';
-      ctx.fillText(title, 36, 220);
-      ctx.font = '15px monospace';
-      ctx.fillText(subtitle, 34, 280);
-      ctx.fillStyle = '#9dc5ff';
-      ctx.fillText(hint, 34, 330);
+      drawRoomBackground();
+      pxRect(18, 160, W - 36, 280, '#2d3559dd');
+      ctx.fillStyle = '#fff1d8'; ctx.font = 'bold 26px monospace'; ctx.fillText(title, 34, 240);
+      ctx.font = '16px monospace'; ctx.fillText(subtitle, 34, 286); ctx.fillStyle = '#9fd0ff'; ctx.fillText(hint, 34, 334);
+      drawMikaro();
     }
 
     function draw() {
       ctx.imageSmoothingEnabled = false;
+      if (state.mode === 'title') return drawMenu('Ouchi Colon', 'ころころレース', 'TAP / ENTER で START');
+      if (state.mode === 'characterSelect') return drawMenu('CHARACTER SELECT', 'MIKARO を選んでね', '← → で選択 / ENTER 決定');
+      if (state.mode === 'courseSelect') return drawMenu('COURSE SELECT', 'リビング 木の床コース', 'ENTER で レース開始');
 
-      if (state.mode === 'title') {
-        drawMenu('Ouchi Colon', 'ころころレース', 'TAP / ENTER で START');
-        return;
-      }
-      if (state.mode === 'characterSelect') {
-        drawMenu('CHARACTER SELECT', 'MIKARO を選んでね', '← → で選択 / ENTER 決定');
-        return;
-      }
-      if (state.mode === 'courseSelect') {
-        drawMenu('COURSE SELECT', 'リビング 木の床コース', 'ENTER で レース開始');
-        return;
-      }
-
-      drawCourse();
-      drawTrackObjects();
-      drawMoolo();
-      drawMikaro();
-      drawHUD();
+      drawCourse(); drawTrackObjects(); drawMoolo(); drawSparkleEffect(); drawMikaro(); drawHUD();
 
       if (state.mode === 'goal' || state.mode === 'gameOver') {
-        ctx.fillStyle = '#0f1020cc';
-        ctx.fillRect(40, 260, W - 80, 220);
-        ctx.fillStyle = '#fff2d7';
-        ctx.font = '28px monospace';
-        ctx.fillText(state.result, 120, 330);
-        ctx.font = '16px monospace';
-        ctx.fillText('SCORE ★ x ' + String(state.score).padStart(2, '0'), 108, 378);
-        ctx.fillText('TAP / ENTER で TITLE へ', 86, 430);
+        pxRect(34, 258, W - 68, 234, '#0f1427dd');
+        ctx.fillStyle = '#fff2d7'; ctx.font = 'bold 30px monospace'; ctx.fillText(state.result, 108, 334);
+        ctx.font = '18px monospace'; ctx.fillText('SCORE ★ x ' + String(state.score).padStart(2, '0'), 96, 388);
+        ctx.fillText('TAP / ENTER で TITLE へ', 76, 436);
       }
     }
 
@@ -336,45 +261,18 @@
     }
 
     function setTouchSteer(clientX) {
-      const rect = canvas.getBoundingClientRect();
-      const localX = clientX - rect.left;
-      keys.left = localX < rect.width / 2;
-      keys.right = !keys.left;
+      const rect = canvas.getBoundingClientRect(); const localX = clientX - rect.left;
+      keys.left = localX < rect.width / 2; keys.right = !keys.left;
     }
 
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') keys.left = true;
-      if (e.key === 'ArrowRight') keys.right = true;
-      if (e.key === 'Enter' || e.key === ' ') handleAdvance();
-    });
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'ArrowLeft') keys.left = false;
-      if (e.key === 'ArrowRight') keys.right = false;
-    });
-
-    canvas.addEventListener('pointerdown', (e) => {
-      if (state.mode !== 'race') {
-        handleAdvance();
-        return;
-      }
-      setTouchSteer(e.clientX);
-    });
-    canvas.addEventListener('pointermove', (e) => {
-      if (state.mode === 'race' && e.buttons) setTouchSteer(e.clientX);
-    });
-    canvas.addEventListener('pointerup', () => {
-      keys.left = false;
-      keys.right = false;
-    });
+    window.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') keys.left = true; if (e.key === 'ArrowRight') keys.right = true; if (e.key === 'Enter' || e.key === ' ') handleAdvance(); });
+    window.addEventListener('keyup', (e) => { if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false; });
+    canvas.addEventListener('pointerdown', (e) => { if (state.mode !== 'race') return handleAdvance(); setTouchSteer(e.clientX); });
+    canvas.addEventListener('pointermove', (e) => { if (state.mode === 'race' && e.buttons) setTouchSteer(e.clientX); });
+    canvas.addEventListener('pointerup', () => { keys.left = false; keys.right = false; });
 
     let last = performance.now();
-    function loop(now) {
-      const dt = Math.min(0.033, (now - last) / 1000);
-      last = now;
-      update(dt);
-      draw();
-      requestAnimationFrame(loop);
-    }
+    function loop(now) { const dt = Math.min(0.033, (now - last) / 1000); last = now; update(dt); draw(); requestAnimationFrame(loop); }
     requestAnimationFrame(loop);
   </script>
 </body>
