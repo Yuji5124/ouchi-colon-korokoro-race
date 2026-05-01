@@ -1,279 +1,60 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Ouchi Colon ころころレース</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #19162a; font-family: monospace; }
-    .frame { width: min(100vw, 430px); padding: 10px; background: #2c2440; border: 4px solid #6f6099; border-radius: 10px; }
-    canvas { width: 390px; height: 844px; max-width: 100%; display: block; border: 4px solid #130f1f; image-rendering: pixelated; touch-action: none; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Ouchi Colon ころころレース</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#1a1727;font-family:monospace}.frame{width:min(100vw,430px);padding:10px;background:#2e2644;border:4px solid #6f6098;border-radius:12px}canvas{width:390px;height:844px;max-width:100%;display:block;border:4px solid #140f20;image-rendering:pixelated;touch-action:none}
+</style>
 </head>
-<body>
-  <div class="frame"><canvas id="game" width="390" height="844"></canvas></div>
-  <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-    const lanes = [-0.62, -0.22, 0.22, 0.62];
-    const keys = { left: false, right: false };
-    const pix = 2;
-
-    const state = {
-      mode: 'title', lap: 1, score: 0, distance: 0, speed: 1.2, maxDistance: 3200,
-      playerX: 0, steer: 0, selectedCharacter: 0, selectedCourse: 0,
-      enemyX: 0, enemyDrift: 0, time: 0, raceTimer: 0,
-      items: [], obstacles: [], sparkles: [], result: 'GOAL!'
-    };
-
-    function resetRace() {
-      state.lap = 1; state.score = 0; state.distance = 0; state.speed = 1.2;
-      state.playerX = 0; state.steer = 0; state.enemyX = 0; state.enemyDrift = 0;
-      state.raceTimer = 0; state.items = []; state.obstacles = []; state.sparkles = [];
-      spawnTrackObjects();
-    }
-
-    function spawnTrackObjects() {
-      for (let z = 220; z < state.maxDistance; z += 120) {
-        if (Math.random() < 0.72) state.items.push({ z, lane: lanes[(Math.random() * lanes.length) | 0], got: false });
-        if (Math.random() < 0.45) state.obstacles.push({ z: z + 55, lane: lanes[(Math.random() * lanes.length) | 0], hit: false });
-      }
-    }
-
-    function jumpEffect() {}
-
-    function project(x, z) {
-      const horizon = H * 0.26;
-      const camZ = 36;
-      const depth = Math.max(0.001, (z - camZ) / 300);
-      const scale = 1 / depth;
-      return { x: W * 0.5 + x * scale * W * 0.46, y: horizon + (1 - scale * 0.2) * H * 0.66, scale };
-    }
-
-    function update(dt) {
-      state.time += dt;
-      if (state.mode !== 'race') return;
-
-      state.raceTimer += dt;
-      state.enemyDrift += dt * 0.7;
-      state.enemyX = Math.sin(state.enemyDrift) * 0.55;
-
-      const steerInput = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
-      state.steer = steerInput;
-      state.playerX = Math.max(-0.8, Math.min(0.8, state.playerX + steerInput * dt * 1.8));
-
-      state.speed = Math.min(4.8, Math.max(0.8, state.speed + 0.08 * dt));
-      state.distance += state.speed * 46 * dt;
-      state.lap = Math.min(3, 1 + ((state.distance / (state.maxDistance / 3)) | 0));
-
-      for (const s of state.items) {
-        if (s.got) continue;
-        const dz = s.z - state.distance;
-        if (dz > 0 && dz < 45 && Math.abs(s.lane - state.playerX) < 0.16) {
-          s.got = true; state.score += 1; state.speed = Math.min(5.2, state.speed + 0.22);
-          for (let i = 0; i < 12; i++) state.sparkles.push({ t: 0.4 + Math.random() * 0.4, x: W * 0.5 + (Math.random() - 0.5) * 70, y: H - 180 + (Math.random() - 0.5) * 50 });
-        }
-      }
-
-      for (const ob of state.obstacles) {
-        if (ob.hit) continue;
-        const dz = ob.z - state.distance;
-        if (dz > 0 && dz < 42 && Math.abs(ob.lane - state.playerX) < 0.2) {
-          ob.hit = true; state.speed = Math.max(0.7, state.speed * 0.72);
-        }
-      }
-
-      state.sparkles = state.sparkles.filter((p) => (p.t -= dt) > 0);
-      if (state.distance >= state.maxDistance) { state.mode = 'goal'; state.result = 'GOAL!'; }
-      if (state.raceTimer > 85) { state.mode = 'gameOver'; state.result = 'TIME UP'; }
-    }
-
-    function pxRect(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect((x / pix | 0) * pix, (y / pix | 0) * pix, (w / pix | 0) * pix, (h / pix | 0) * pix); }
-
-    function drawRoomBackground() {
-      pxRect(0, 0, W, H, '#f6d9be');
-      pxRect(0, 0, W, 270, '#ffe7cf');
-      for (let y = 8; y < 260; y += 18) for (let x = 8; x < W; x += 18) pxRect(x, y, 4, 4, (x + y) % 36 ? '#ffd8ba' : '#fff3a4');
-      pxRect(132, 36, 126, 90, '#a8e0ff');
-      pxRect(126, 30, 138, 102, '#f7f7ff');
-      pxRect(146, 36, 18, 90, '#ffd7ef'); pxRect(226, 36, 18, 90, '#ffd7ef');
-      drawLivingProps();
-      drawWoodFloor();
-    }
-
-    function drawLivingProps() {
-      pxRect(14, 168, 100, 56, '#8ec7f7'); pxRect(24, 152, 80, 20, '#9bd0ff');
-      pxRect(284, 138, 92, 94, '#d6a278'); for (let i = 0; i < 4; i++) pxRect(294, 152 + i * 20, 72, 8, ['#96d17c', '#f4a0ba', '#88b4ff', '#f4de75'][i]);
-      pxRect(316, 232, 36, 28, '#73b36d'); pxRect(330, 210, 8, 24, '#7a5a3b');
-      pxRect(44, 238, 26, 22, '#fff3f3'); pxRect(48, 230, 6, 8, '#f4b8b8'); pxRect(60, 230, 6, 8, '#f4b8b8');
-      pxRect(86, 250, 16, 16, '#ff6f6f'); pxRect(106, 252, 20, 14, '#7ab9ff'); pxRect(130, 248, 14, 18, '#ffd46f');
-      ctx.fillStyle = '#ff95ba'; ctx.beginPath(); ctx.arc(262, 248, 11, 0, Math.PI * 2); ctx.fill();
-    }
-
-    function drawWoodFloor() {
-      pxRect(0, 260, W, H - 260, '#be8c5e');
-      for (let y = 260; y < H; y += 20) pxRect(0, y, W, 2, '#aa7649');
-      for (let x = 0; x < W; x += 30) pxRect(x, 260, 2, H - 260, '#c9996d');
-    }
-
-    function drawTrack() {
-      const horizon = H * 0.3;
-      for (let y = horizon; y < H; y += 4) {
-        const t = (y - horizon) / (H - horizon);
-        const half = 52 + t * 150;
-        const cx = W * 0.5;
-        const l = cx - half, r = cx + half;
-        pxRect(l, y, r - l, 4, ((y + state.distance) / 18 | 0) % 2 ? '#d5a170' : '#c99362');
-        pxRect(l - 10, y, 10, 4, ((y / 10) | 0) % 2 ? '#ffffff' : '#ff5b5b');
-        pxRect(r, y, 10, 4, ((y / 10) | 0) % 2 ? '#ffffff' : '#ff5b5b');
-        if ((y / 24 | 0) % 2 === 0) pxRect(cx - 2, y, 4, 4, '#f7e8cf');
-      }
-    }
-
-    function drawCourse() {
-      drawRoomBackground();
-      drawTrack();
-    }
-
-    function drawPixelLogo() {
-      pxRect(W / 2 - 108, 8, 216, 40, '#ffffffdd');
-      pxRect(W / 2 - 104, 12, 208, 32, '#f5fbff');
-      ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#294059'; ctx.fillText('Ouchi Colon ころころレース', W / 2 - 90, 35);
-      ctx.fillStyle = '#90b4d4'; ctx.fillText('Ouchi Colon ころころレース', W / 2 - 89, 34);
-    }
-
-    function drawStar(x, y, s) {
-      ctx.strokeStyle = '#fffbe8'; ctx.lineWidth = 2;
-      ctx.fillStyle = '#ffd84d';
-      ctx.beginPath();
-      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5; const r = i % 2 ? s * 0.45 : s; const px = x + Math.cos(a) * r; const py = y + Math.sin(a) * r; i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      pxRect(x - 1, y - s - 8, 2, 6, '#fff8cc');
-    }
-
-    function drawToyBlock(x, y, scale, c1, c2) {
-      const w = 20 * scale, h = 17 * scale;
-      pxRect(x - w / 2, y - h, w, h, c1); pxRect(x - w / 2 + 4, y - h + 4, w - 8, h - 8, c2);
-      ctx.fillStyle = '#fff3d6'; ctx.font = `${Math.max(8, 8 * scale)}px monospace`; ctx.fillText('★', x - 4 * scale, y - 5 * scale);
-    }
-
-    function drawObstacle(x, y, s) { drawToyBlock(x, y, s, '#5b7dff', '#ff6d6d'); }
-
-    function drawMoolo() {
-      if (state.mode !== 'race') return;
-      const p = project(state.enemyX, 150), s = Math.max(0.9, Math.min(1.6, p.scale * 1.7));
-      ctx.fillStyle = '#4dd57c'; ctx.beginPath(); ctx.arc(p.x, p.y - 20 * s, 18 * s, 0, Math.PI * 2); ctx.fill();
-      pxRect(p.x - 12 * s, p.y - 24 * s, 24 * s, 12 * s, '#1d2e35');
-      pxRect(p.x - 7 * s, p.y - 21 * s, 4 * s, 4 * s, '#d6f6ff'); pxRect(p.x + 3 * s, p.y - 21 * s, 4 * s, 4 * s, '#d6f6ff');
-    }
-
-    function drawMikaro() {
-      const bob = Math.sin(state.time * 9) * 4;
-      const y = H - 118 + bob, x = W * 0.5 + state.playerX * 120;
-      pxRect(x - 54, y - 18, 18, 26, '#3a3f5f'); pxRect(x + 36, y - 18, 18, 26, '#3a3f5f');
-      ctx.strokeStyle = '#2a2340'; ctx.lineWidth = 6;
-      ctx.fillStyle = '#f5f2e8'; ctx.beginPath(); ctx.arc(x, y - 16, 42, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      pxRect(x - 28, y - 54, 16, 12, '#9cd4ff'); pxRect(x + 12, y - 54, 16, 12, '#9cd4ff');
-      pxRect(x - 22, y - 28, 44, 20, '#f8d9b4'); pxRect(x - 14, y - 22, 8, 6, '#222'); pxRect(x + 6, y - 22, 8, 6, '#222');
-    }
-
-    function drawSparkleEffect() {
-      for (const p of state.sparkles) {
-        const a = Math.max(0, p.t / 0.8);
-        ctx.fillStyle = `rgba(255,255,220,${a})`;
-        pxRect(p.x - 2, p.y - 2, 4, 4, `rgba(255,255,220,${a})`);
-      }
-    }
-
-    function drawMiniMap() {
-      pxRect(10, H - 120, 126, 90, '#192a42cc');
-      ctx.strokeStyle = '#f1fbff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(28, H - 58); ctx.bezierCurveTo(48, H - 102, 96, H - 102, 116, H - 58); ctx.stroke();
-      const p = Math.min(1, state.distance / state.maxDistance);
-      const px = 28 + p * 88;
-      ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(px, H - 68, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#6effa4'; ctx.beginPath(); ctx.arc(28 + (0.2 + 0.6 * (Math.sin(state.enemyDrift) * 0.5 + 0.5)) * 88, H - 74, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#d8efff'; ctx.font = '12px monospace'; ctx.fillText('MINI MAP', 24, H - 98);
-    }
-
-    function drawSpeedMeter() {
-      pxRect(W - 144, H - 126, 132, 94, '#192a42cc');
-      ctx.fillStyle = '#d8efff'; ctx.font = '14px monospace'; ctx.fillText('SPEED', W - 122, H - 100);
-      ctx.font = 'bold 20px monospace'; ctx.fillText((state.speed * 30 | 0) + ' km/h', W - 132, H - 74);
-      const ratio = Math.min(1, state.speed / 5.2);
-      pxRect(W - 126, H - 58, 108, 14, '#2f4263');
-      pxRect(W - 126, H - 58, 108 * ratio, 14, ratio > 0.7 ? '#ff8e6f' : '#7ff0a4');
-    }
-
-    function drawHUD() {
-      drawPixelLogo();
-      pxRect(10, 12, 96, 34, '#223a58dd'); pxRect(W - 110, 12, 98, 34, '#223a58dd');
-      ctx.fillStyle = '#eff8ff'; ctx.font = 'bold 18px monospace'; ctx.fillText(`LAP ${state.lap}/3`, 18, 34);
-      ctx.fillText(`★ x ${String(state.score).padStart(2, '0')}`, W - 102, 34);
-      drawMiniMap(); drawSpeedMeter();
-    }
-
-    function drawTrackObjects() {
-      for (const star of state.items) {
-        if (star.got) continue;
-        const dz = star.z - state.distance; if (dz < 20 || dz > 420) continue;
-        const p = project(star.lane, dz + 60), s = Math.max(6, Math.min(16, p.scale * 44));
-        drawStar(p.x, p.y - s, s);
-      }
-      for (const ob of state.obstacles) {
-        if (ob.hit) continue;
-        const dz = ob.z - state.distance; if (dz < 20 || dz > 420) continue;
-        const p = project(ob.lane, dz + 60), s = Math.max(0.8, Math.min(2.4, p.scale * 5.2));
-        drawObstacle(p.x, p.y, s);
-      }
-    }
-
-    function drawMenu(title, subtitle, hint) {
-      drawRoomBackground();
-      pxRect(18, 160, W - 36, 280, '#2d3559dd');
-      ctx.fillStyle = '#fff1d8'; ctx.font = 'bold 26px monospace'; ctx.fillText(title, 34, 240);
-      ctx.font = '16px monospace'; ctx.fillText(subtitle, 34, 286); ctx.fillStyle = '#9fd0ff'; ctx.fillText(hint, 34, 334);
-      drawMikaro();
-    }
-
-    function draw() {
-      ctx.imageSmoothingEnabled = false;
-      if (state.mode === 'title') return drawMenu('Ouchi Colon', 'ころころレース', 'TAP / ENTER で START');
-      if (state.mode === 'characterSelect') return drawMenu('CHARACTER SELECT', 'MIKARO を選んでね', '← → で選択 / ENTER 決定');
-      if (state.mode === 'courseSelect') return drawMenu('COURSE SELECT', 'リビング 木の床コース', 'ENTER で レース開始');
-
-      drawCourse(); drawTrackObjects(); drawMoolo(); drawSparkleEffect(); drawMikaro(); drawHUD();
-
-      if (state.mode === 'goal' || state.mode === 'gameOver') {
-        pxRect(34, 258, W - 68, 234, '#0f1427dd');
-        ctx.fillStyle = '#fff2d7'; ctx.font = 'bold 30px monospace'; ctx.fillText(state.result, 108, 334);
-        ctx.font = '18px monospace'; ctx.fillText('SCORE ★ x ' + String(state.score).padStart(2, '0'), 96, 388);
-        ctx.fillText('TAP / ENTER で TITLE へ', 76, 436);
-      }
-    }
-
-    function handleAdvance() {
-      if (state.mode === 'title') state.mode = 'characterSelect';
-      else if (state.mode === 'characterSelect') state.mode = 'courseSelect';
-      else if (state.mode === 'courseSelect') { resetRace(); state.mode = 'race'; }
-      else if (state.mode === 'goal' || state.mode === 'gameOver') state.mode = 'title';
-    }
-
-    function setTouchSteer(clientX) {
-      const rect = canvas.getBoundingClientRect(); const localX = clientX - rect.left;
-      keys.left = localX < rect.width / 2; keys.right = !keys.left;
-    }
-
-    window.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') keys.left = true; if (e.key === 'ArrowRight') keys.right = true; if (e.key === 'Enter' || e.key === ' ') handleAdvance(); });
-    window.addEventListener('keyup', (e) => { if (e.key === 'ArrowLeft') keys.left = false; if (e.key === 'ArrowRight') keys.right = false; });
-    canvas.addEventListener('pointerdown', (e) => { if (state.mode !== 'race') return handleAdvance(); setTouchSteer(e.clientX); });
-    canvas.addEventListener('pointermove', (e) => { if (state.mode === 'race' && e.buttons) setTouchSteer(e.clientX); });
-    canvas.addEventListener('pointerup', () => { keys.left = false; keys.right = false; });
-
-    let last = performance.now();
-    function loop(now) { const dt = Math.min(0.033, (now - last) / 1000); last = now; update(dt); draw(); requestAnimationFrame(loop); }
-    requestAnimationFrame(loop);
-  </script>
-</body>
-</html>
+<body><div class="frame"><canvas id="game" width="390" height="844"></canvas></div>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const W=390,H=844,pix=2,lanes=[-0.62,-0.22,0.22,0.62],keys={left:false,right:false};
+const state={mode:'title',lap:1,score:0,distance:0,speed:1.2,maxDistance:3200,playerX:0,steer:0,selectedCharacter:0,selectedCourse:0,enemyX:0,enemyDrift:0,time:0,raceTimer:0,items:[],obstacles:[],sparkles:[],hitTimer:0,shake:0,result:'GOAL!'};
+function resetRace(){Object.assign(state,{lap:1,score:0,distance:0,speed:1.2,playerX:0,steer:0,enemyX:0,enemyDrift:0,raceTimer:0,items:[],obstacles:[],sparkles:[],hitTimer:0,shake:0});spawnTrackObjects();}
+function spawnTrackObjects(){for(let z=220;z<state.maxDistance;z+=120){if(Math.random()<0.72)state.items.push({z,lane:lanes[(Math.random()*lanes.length)|0],got:false});if(Math.random()<0.45)state.obstacles.push({z:z+55,lane:lanes[(Math.random()*lanes.length)|0],hit:false});}}
+function jumpEffect(){}
+function project(x,z){const horizon=250,camZ=36,depth=Math.max(.001,(z-camZ)/300),s=1/depth;return{x:W*.5+x*s*W*.48,y:horizon+(1-s*.2)*H*.66,scale:s};}
+function update(dt){state.time+=dt;if(state.mode!=='race')return;state.raceTimer+=dt;state.enemyDrift+=dt*.7;state.enemyX=Math.sin(state.enemyDrift)*.55;const steer=(keys.left?-1:0)+(keys.right?1:0);state.steer=steer;state.playerX=Math.max(-.8,Math.min(.8,state.playerX+steer*dt*1.8));state.speed=Math.min(4.8,Math.max(.8,state.speed+.08*dt));state.distance+=state.speed*46*dt;state.lap=Math.min(3,1+((state.distance/(state.maxDistance/3))|0));if(state.hitTimer>0)state.hitTimer-=dt;state.shake=Math.max(0,state.shake-dt*8);
+for(const s of state.items){if(s.got)continue;const dz=s.z-state.distance;if(dz>0&&dz<45&&Math.abs(s.lane-state.playerX)<.16){s.got=true;state.score++;state.speed=Math.min(5.2,state.speed+.22);for(let i=0;i<18;i++)state.sparkles.push({t:.65+Math.random()*.45,x:W*.5+(Math.random()-.5)*90,y:H-220+(Math.random()-.5)*80,vx:(Math.random()-.5)*50,vy:(Math.random()-.5)*40});}}
+for(const ob of state.obstacles){if(ob.hit)continue;const dz=ob.z-state.distance;if(dz>0&&dz<42&&Math.abs(ob.lane-state.playerX)<.2){ob.hit=true;state.speed=Math.max(.7,state.speed*.72);state.hitTimer=.35;state.shake=1;}}
+for(const p of state.sparkles){p.t-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;}state.sparkles=state.sparkles.filter(p=>p.t>0);
+if(state.distance>=state.maxDistance){state.mode='goal';state.result='GOAL!';}
+if(state.raceTimer>85){state.mode='gameOver';state.result='TIME UP';}}
+function r(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect((x/pix|0)*pix,(y/pix|0)*pix,(w/pix|0)*pix,(h/pix|0)*pix);} 
+function drawScreenShake(){if(state.shake<=0)return;const s=state.shake*6;ctx.translate((Math.random()-.5)*s,(Math.random()-.5)*s);} 
+function drawWallpaper(){r(0,0,W,290,'#ffe9d1');for(let y=22;y<280;y+=28)for(let x=14;x<W;x+=28){const m=(x+y)%4;const c=['#ffd98f','#9bc9ff','#ffb4b4','#9de0a4'][m];if(m===0)r(x,y,8,8,c);if(m===1){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x+4,y+4,4,0,6.28);ctx.fill();}if(m===2){ctx.fillStyle=c;ctx.beginPath();ctx.moveTo(x+4,y);ctx.lineTo(x+8,y+4);ctx.lineTo(x+4,y+8);ctx.lineTo(x,y+4);ctx.closePath();ctx.fill();}if(m===3){r(x+2,y+2,4,4,c);}}}
+function drawWindowAndCurtains(){r(26,104,90,112,'#7cc7ff');r(22,100,98,120,'#9b6a39');r(66,104,4,112,'#9b6a39');r(26,156,90,4,'#9b6a39');r(10,98,28,126,'#f58fa0');r(102,98,28,126,'#f58fa0');r(20,154,16,10,'#de6b87');r(104,154,16,10,'#de6b87');}
+function drawSofa(){r(130,200,132,66,'#2f9fe0');r(148,178,96,34,'#41afea');r(130,220,20,46,'#268cca');r(242,220,20,46,'#268cca');ctx.fillStyle='#ffd44d';ctx.beginPath();ctx.arc(204,229,16,0,6.28);ctx.fill();}
+function drawBookshelf(){r(284,142,92,132,'#c18447');for(let i=0;i<4;i++)r(294,156+i*24,72,12,['#a0db84','#8eb5ff','#f4accc','#ffd56a'][i]);r(290,238,78,24,'#c98d52');r(300,242,26,14,'#8ed36f');r(332,242,26,14,'#f4b96c');}
+function drawPlantsAndToys(){r(0,260,W,30,'#c08d5a');r(8,222,44,44,'#cb7a37');ctx.fillStyle='#34b050';ctx.beginPath();ctx.ellipse(30,214,22,20,0,0,6.28);ctx.fill();r(46,238,28,24,'#8ec7ff');r(78,240,24,22,'#ff6b7e');ctx.fillStyle='#59a9ff';ctx.beginPath();ctx.arc(114,250,12,0,6.28);ctx.fill();r(318,246,52,20,'#f8c258');r(326,230,34,18,'#e45757');r(334,252,18,14,'#67b2ff');}
+function drawWoodFloor(){r(0,290,W,H-290,'#b77a42');for(let y=292;y<H;y+=22)r(0,y,W,2,'#a56734');for(let x=0;x<W;x+=26)r(x,290,2,H-290,'#c48852');}
+function drawPerspectiveTrack(){const h=292;for(let y=h;y<H;y+=4){const t=(y-h)/(H-h),half=62+t*158,cx=W*.5,l=cx-half,ri=cx+half;r(l,y,ri-l,4,((y+state.distance)/16|0)%2?'#bb7d45':'#ad6f3d');r(l-11,y,11,4,((y/10|0)%2)?'#fff':'#ff7a84');r(ri,y,11,4,((y/10|0)%2)?'#fff':'#ff7a84');if((y/20|0)%2===0)r(cx-2,y,4,4,'#f9e0be');}}
+function drawRoomBackground(){drawWallpaper();drawWindowAndCurtains();drawSofa();drawBookshelf();drawPlantsAndToys();drawWoodFloor();}
+function drawCourse(){drawRoomBackground();drawPerspectiveTrack();}
+function drawRaceLogo(){r(W/2-120,8,240,58,'#fff');r(W/2-116,12,232,50,'#f9fdff');ctx.fillStyle='#2f74b6';ctx.font='bold 14px monospace';ctx.fillText('Ouchi Colon',W/2-50,30);const txt='ころころレース';const cols=['#ff6464','#ffbe3d','#49a5ff','#5fcf59','#ff6464','#ffbe3d','#49a5ff'];ctx.font='bold 28px monospace';for(let i=0;i<txt.length;i++){ctx.fillStyle='black';ctx.fillText(txt[i],W/2-96+i*28+2,57+2);ctx.fillStyle=cols[i%cols.length];ctx.fillText(txt[i],W/2-96+i*28,57);}}
+function drawLargeLapHud(){ctx.font='bold 30px monospace';ctx.fillStyle='black';ctx.fillText(`LAP`,16,46);ctx.fillText(`${state.lap}/3`,16,80);ctx.fillStyle='white';ctx.fillText(`LAP`,12,42);ctx.fillText(`${state.lap}/3`,12,76);} 
+function drawLargeStarHud(){ctx.font='bold 28px monospace';ctx.fillStyle='black';ctx.fillText(`★ x ${String(state.score).padStart(2,'0')}`,W-148,48);ctx.fillStyle='white';ctx.fillText(`★ x ${String(state.score).padStart(2,'0')}`,W-152,44);} 
+function drawStar(x,y,s){ctx.fillStyle='#ff9a24';ctx.beginPath();for(let i=0;i<10;i++){const a=-1.57+i*.628,r=i%2?s:s*.45;ctx[i?'lineTo':'moveTo'](x+Math.cos(a)*r,y+Math.sin(a)*r);}ctx.closePath();ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#ffd84d';ctx.beginPath();for(let i=0;i<10;i++){const a=-1.57+i*.628,r=i%2?s*.8:s*.36;ctx[i?'lineTo':'moveTo'](x+Math.cos(a)*r,y+Math.sin(a)*r);}ctx.closePath();ctx.fill();}
+function drawToyBlock(x,y,s,c1,c2){const w=24*s,h=20*s;r(x-w/2,y-h,w,h,c1);r(x-w/2+3,y-h+3,w-6,h-6,c2);ctx.fillStyle='rgba(255,255,255,.25)';r(x-w/2+4,y-h+4,w-14,5,ctx.fillStyle);ctx.fillStyle='#ffdbe0';ctx.font=`${Math.max(8,8*s)}px monospace`;ctx.fillText('★',x-4*s,y-6*s);} 
+function drawObstacle(x,y,s){drawToyBlock(x,y,s,'#df4364','#2e9cf1');}
+function drawMoolo(){if(state.mode!=='race')return;const p=project(state.enemyX,150),s=Math.max(1,Math.min(1.8,p.scale*1.8));ctx.strokeStyle='#102812';ctx.lineWidth=4*s;ctx.fillStyle='#53d25f';ctx.beginPath();ctx.arc(p.x,p.y-22*s,20*s,0,6.28);ctx.fill();ctx.stroke();r(p.x-13*s,p.y-28*s,26*s,12*s,'#14202a');r(p.x-8*s,p.y-24*s,5*s,4*s,'#effaff');r(p.x+3*s,p.y-24*s,5*s,4*s,'#effaff');r(p.x-20*s,p.y-5*s,10*s,10*s,'#292f38');r(p.x+10*s,p.y-5*s,10*s,10*s,'#292f38');}
+function drawMikaro(){const bob=Math.sin(state.time*9)*4,y=H-132+bob,x=W*.5+state.playerX*120,blink=state.hitTimer>0&&((state.time*24|0)%2===0);if(blink)return;ctx.strokeStyle='#2b2012';ctx.lineWidth=8;r(x-62,y-18,22,32,'#24242f');r(x+40,y-18,22,32,'#24242f');ctx.fillStyle='#ffd22f';ctx.beginPath();ctx.arc(x,y-18,48,0,6.28);ctx.fill();ctx.stroke();ctx.fillStyle='#ffe784';ctx.beginPath();ctx.arc(x-12,y-34,14,0,6.28);ctx.fill();ctx.fillStyle='#2d2a1f';ctx.beginPath();ctx.arc(x,y-8,17,0,6.28);ctx.fill();ctx.fillStyle='#f7b029';ctx.font='bold 18px monospace';ctx.fillText('8',x-6,y-2);r(x-30,y-60,15,15,'#73cbff');r(x+15,y-60,15,15,'#73cbff');r(x-18,y+22,36,10,'#252525');r(x-16,y+24,10,6,'#ff5858');r(x+6,y+24,10,6,'#ff5858');}
+function drawSparkleEffect(){for(const p of state.sparkles){const a=Math.min(1,p.t/.6);ctx.strokeStyle=`rgba(255,245,170,${a})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,(1-a)*12+6,0,6.28);ctx.stroke();r(p.x-1,p.y-6,2,12,`rgba(255,255,255,${a})`);r(p.x-6,p.y-1,12,2,`rgba(255,255,255,${a})`);} }
+function drawMiniMap(){r(16,H-204,120,140,'#1b2435cc');ctx.strokeStyle='#fff';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(44,H-54);ctx.bezierCurveTo(8,H-110,30,H-170,84,H-182);ctx.bezierCurveTo(122,H-176,130,H-108,98,H-82);ctx.bezierCurveTo(70,H-62,78,H-36,44,H-54);ctx.stroke();const p=Math.min(1,state.distance/state.maxDistance);ctx.fillStyle='#56a9ff';ctx.beginPath();ctx.arc(36+p*58,H-66-p*90,5,0,6.28);ctx.fill();ctx.fillStyle='#ff6d8a';ctx.beginPath();ctx.arc(36+((Math.sin(state.enemyDrift)*.5+.5)*58),H-74,5,0,6.28);ctx.fill();}
+function drawSpeedMeter(){r(W-170,H-190,154,126,'#1b2435cc');const sp=String((state.speed*30|0)).padStart(3,'0');ctx.fillStyle='black';ctx.font='bold 58px monospace';ctx.fillText(sp,W-164,H-114);ctx.fillStyle='white';ctx.fillText(sp,W-168,H-118);ctx.font='bold 22px monospace';ctx.fillText('km/h',W-66,H-112);const x=W-158,y=H-96,w=128,h=20;r(x,y,w,h,'#24324b');const ratio=Math.min(1,state.speed/5.2),fw=w*ratio;const grad=ctx.createLinearGradient(x,0,x+w,0);grad.addColorStop(0,'#73df66');grad.addColorStop(.45,'#f2e640');grad.addColorStop(.8,'#ff9b2d');grad.addColorStop(1,'#ff5b5b');ctx.fillStyle=grad;ctx.fillRect(x,y,fw,h);ctx.strokeStyle='#101010';ctx.lineWidth=3;ctx.strokeRect(x,y,w,h);} 
+function drawHUD(){drawRaceLogo();drawLargeLapHud();drawLargeStarHud();drawMiniMap();drawSpeedMeter();}
+function drawTrackObjects(){for(const s of state.items){if(s.got)continue;const dz=s.z-state.distance;if(dz<20||dz>420)continue;const p=project(s.lane,dz+60),sz=Math.max(8,Math.min(18,p.scale*48));drawStar(p.x,p.y-sz,sz);}for(const ob of state.obstacles){if(ob.hit)continue;const dz=ob.z-state.distance;if(dz<20||dz>420)continue;const p=project(ob.lane,dz+60),sz=Math.max(.9,Math.min(2.6,p.scale*5.4));drawObstacle(p.x,p.y,sz);}}
+function drawMenu(t,s,h){drawRoomBackground();r(18,160,W-36,280,'#2d3559dd');ctx.fillStyle='#fff1d8';ctx.font='bold 26px monospace';ctx.fillText(t,34,240);ctx.font='16px monospace';ctx.fillText(s,34,286);ctx.fillStyle='#9fd0ff';ctx.fillText(h,34,334);drawMikaro();}
+function draw(){ctx.save();ctx.imageSmoothingEnabled=false;drawScreenShake();if(state.mode==='title'){drawMenu('Ouchi Colon','ころころレース','TAP / ENTER で START');ctx.restore();return;}if(state.mode==='characterSelect'){drawMenu('CHARACTER SELECT','MIKARO を選んでね','← → で選択 / ENTER 決定');ctx.restore();return;}if(state.mode==='courseSelect'){drawMenu('COURSE SELECT','リビング 木の床コース','ENTER で レース開始');ctx.restore();return;}drawCourse();drawTrackObjects();drawMoolo();drawSparkleEffect();drawMikaro();drawHUD();if(state.mode==='goal'||state.mode==='gameOver'){r(34,258,W-68,234,'#0f1427dd');ctx.fillStyle='#fff2d7';ctx.font='bold 30px monospace';ctx.fillText(state.result,108,334);ctx.font='18px monospace';ctx.fillText('SCORE ★ x '+String(state.score).padStart(2,'0'),96,388);ctx.fillText('TAP / ENTER で TITLE へ',76,436);}ctx.restore();}
+function handleAdvance(){if(state.mode==='title')state.mode='characterSelect';else if(state.mode==='characterSelect')state.mode='courseSelect';else if(state.mode==='courseSelect'){resetRace();state.mode='race';}else if(state.mode==='goal'||state.mode==='gameOver')state.mode='title';}
+function setTouchSteer(clientX){const rect=canvas.getBoundingClientRect(),x=clientX-rect.left;keys.left=x<rect.width/2;keys.right=!keys.left;}
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.left=true;if(e.key==='ArrowRight')keys.right=true;if(e.key==='Enter'||e.key===' ')handleAdvance();});
+addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.left=false;if(e.key==='ArrowRight')keys.right=false;});
+canvas.addEventListener('pointerdown',e=>{if(state.mode!=='race')return handleAdvance();setTouchSteer(e.clientX);});
+canvas.addEventListener('pointermove',e=>{if(state.mode==='race'&&e.buttons)setTouchSteer(e.clientX);});
+canvas.addEventListener('pointerup',()=>{keys.left=false;keys.right=false;});
+let last=performance.now();function loop(now){const dt=Math.min(.033,(now-last)/1e3);last=now;update(dt);draw();requestAnimationFrame(loop);}requestAnimationFrame(loop);
+</script></body></html>
