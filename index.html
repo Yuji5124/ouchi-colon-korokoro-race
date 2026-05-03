@@ -20,7 +20,8 @@ function loadAssets(){
     mikaro:'assets/mikaro_back.png',
     moolo:'assets/moolo_enemy.png',
     blockRed:'assets/block_red.png',
-    blockBlue:'assets/block_blue.png'
+    blockBlue:'assets/block_blue.png',
+    opening:'assets/opening_title.png'
   };
   for(const [k,src] of Object.entries(files)){
     const img=new Image();
@@ -71,7 +72,7 @@ function drawMiniMap(){r(16,H-204,120,140,'#1b2435cc');ctx.strokeStyle='#fff';ct
 function drawSpeedMeter(){r(W-170,H-190,154,126,'#1b2435cc');const sp=String((state.speed*30|0)).padStart(3,'0');ctx.fillStyle='black';ctx.font='bold 58px monospace';ctx.fillText(sp,W-164,H-114);ctx.fillStyle='white';ctx.fillText(sp,W-168,H-118);ctx.font='bold 22px monospace';ctx.fillText('km/h',W-66,H-112);const x=W-158,y=H-96,w=128,h=20;r(x,y,w,h,'#24324b');const ratio=Math.min(1,state.speed/5.2),fw=w*ratio;const grad=ctx.createLinearGradient(x,0,x+w,0);grad.addColorStop(0,'#73df66');grad.addColorStop(.45,'#f2e640');grad.addColorStop(.8,'#ff9b2d');grad.addColorStop(1,'#ff5b5b');ctx.fillStyle=grad;ctx.fillRect(x,y,fw,h);ctx.strokeStyle='#101010';ctx.lineWidth=3;ctx.strokeRect(x,y,w,h);} 
 function drawHUD(){drawRaceLogo();drawLargeLapHud();drawLargeStarHud();drawMiniMap();drawSpeedMeter();}
 function drawTrackObjects(){for(const s of state.items){if(s.got)continue;const dz=s.z-state.distance;if(dz<20||dz>420)continue;const p=project(s.lane,dz+60),sz=Math.max(8,Math.min(18,p.scale*48));drawStar(p.x,p.y-sz,sz);}for(const ob of state.obstacles){if(ob.hit)continue;const dz=ob.z-state.distance;if(dz<20||dz>420)continue;const p=project(ob.lane,dz+60),sz=Math.max(.9,Math.min(2.6,p.scale*5.4));drawObstacle(p.x,p.y,sz,ob.color||((ob.lane<0)?'red':'blue'));}}
-function drawMenu(t,s,h){drawRoomBackground();r(18,160,W-36,280,'#2d3559dd');ctx.fillStyle='#fff1d8';ctx.font='bold 26px monospace';ctx.fillText(t,34,240);ctx.font='16px monospace';ctx.fillText(s,34,286);ctx.fillStyle='#9fd0ff';ctx.fillText(h,34,334);drawMikaro();}
+function drawMenu(t,s,h){if(state.mode==='title'){const img=assets.opening;if(img&&img.loaded){ctx.drawImage(img,0,0,W,H);return;}}drawRoomBackground();r(18,160,W-36,280,'#2d3559dd');ctx.fillStyle='#fff1d8';ctx.font='bold 26px monospace';ctx.fillText(t,34,240);ctx.font='16px monospace';ctx.fillText(s,34,286);ctx.fillStyle='#9fd0ff';ctx.fillText(h,34,334);drawMikaro();}
 function draw(){ctx.save();ctx.imageSmoothingEnabled=false;drawScreenShake();if(state.mode==='title'){drawMenu('Ouchi Colon','ころころレース','TAP / ENTER で START');ctx.restore();return;}if(state.mode==='characterSelect'){drawMenu('CHARACTER SELECT','MIKARO を選んでね','← → で選択 / ENTER 決定');ctx.restore();return;}if(state.mode==='courseSelect'){drawMenu('COURSE SELECT','リビング 木の床コース','ENTER で レース開始');ctx.restore();return;}drawCourse();drawMoolo();drawTrackObjects();drawSparkleEffect();drawMikaro();drawHUD();if(state.mode==='goal'||state.mode==='gameOver'){r(34,258,W-68,234,'#0f1427dd');ctx.fillStyle='#fff2d7';ctx.font='bold 30px monospace';ctx.fillText(state.result,108,334);ctx.font='18px monospace';ctx.fillText('SCORE ★ x '+String(state.score).padStart(2,'0'),96,388);ctx.fillText('TAP / ENTER で TITLE へ',76,436);}ctx.restore();}
 function handleAdvance(){if(state.mode==='title')state.mode='characterSelect';else if(state.mode==='characterSelect')state.mode='courseSelect';else if(state.mode==='courseSelect'){resetRace();state.mode='race';}else if(state.mode==='goal'||state.mode==='gameOver')state.mode='title';}
 function setTouchSteer(clientX){const rect=canvas.getBoundingClientRect(),x=clientX-rect.left;keys.left=x<rect.width/2;keys.right=!keys.left;}
