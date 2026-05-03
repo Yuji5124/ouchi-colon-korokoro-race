@@ -53,7 +53,3 @@ git push origin main
 - `assets/opening_title.png`
 
 `title` 画面でこの画像が見つかれば全画面表示され、無い場合は従来の描画画面が表示されます。
-
-
-### assetsフォルダがない場合
-`assets/` が存在しない場合は作成してください（例: `assets/.gitkeep` を置いて管理）。
